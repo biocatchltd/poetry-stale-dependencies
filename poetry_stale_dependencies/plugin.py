@@ -55,7 +55,10 @@ class ShowStaleCommand(Command):
         any_stale = False
         with Client() as client:
             for inspec_spec in inspec_specs:
-                any_stale |= inspec_spec.inspect(client, self)
+                result = inspec_spec.inspect(client, self)
+                any_stale |= result
+                if not result:
+                    self.line(f"{inspec_spec.package} is up to date", verbosity=Verbosity.VERBOSE)
         if not any_stale:
             self.line("No stale dependencies found", verbosity=Verbosity.NORMAL)
         return 0
