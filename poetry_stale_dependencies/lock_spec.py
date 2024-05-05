@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass, field
-from functools import total_ordering
-from sys import version
 from typing import Any, ClassVar
 from warnings import warn
+
 from cleo.commands.command import Command
 from cleo.io.outputs.output import Verbosity
+
 
 @dataclass
 class LegacyPackageSource:
@@ -15,6 +14,7 @@ class LegacyPackageSource:
     reference: str
 
     Pypi: ClassVar[LegacyPackageSource]
+
 
 LegacyPackageSource.Pypi = LegacyPackageSource("https://pypi.org/simple", "pypi")
 
@@ -50,13 +50,19 @@ class LockSpec:
             version = package.get("version")
             raw_source = package.get("source")
             if name is None or version is None:
-                com.line_error(f"Package missing name or version, package ({name=}, {version=}) will be ignored", verbosity=Verbosity.NORMAL)
+                com.line_error(
+                    f"Package missing name or version, package ({name=}, {version=}) will be ignored",
+                    verbosity=Verbosity.NORMAL,
+                )
                 continue
             if raw_source is None:
                 source = None
             elif raw_source.get("type") != "legacy":
                 # I don't have any examples of this so far, so I'm not sure what to do
-                com.line_error(f"Unsupported source type: {raw_source.get('type')}, package {name} will be ignored", verbosity=Verbosity.NORMAL)
+                com.line_error(
+                    f"Unsupported source type: {raw_source.get('type')}, package {name} will be ignored",
+                    verbosity=Verbosity.NORMAL,
+                )
                 source = None
             else:
                 source = LegacyPackageSource(

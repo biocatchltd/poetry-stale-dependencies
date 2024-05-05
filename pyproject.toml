@@ -28,6 +28,9 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 target-version = "py310"
+line-length = 120
+output-format = "full"
+[tool.ruff.lint]
 # https://beta.ruff.rs/docs/rules/
 select = ["I", "E", "W", "F", "N", "S", "BLE", "COM", "C4", "ISC", "ICN", "G", "PIE", "T20", "PYI", "Q", "SLF", "SIM",
           "ERA", "PGH", "PLC", "PLE", "PLR", "PLW", "RUF", "PT", "UP", "B", "ANN", "ASYNC", "FBT003", "A", "INP",
@@ -58,19 +61,17 @@ ignore = [
     "B028",  # no explicit stacklevel on warn
     "BLE001",  # Do not catch blind exception: `Exception`
 ]
-line-length = 120
-show-source = true
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 combine-as-imports=true
 
-[tool.ruff.flake8-annotations]
+[tool.ruff.lint.flake8-annotations]
 suppress-none-returning = true
 
-[tool.ruff.flake8-pytest-style]
+[tool.ruff.lint.flake8-pytest-style]
 raises-require-match-for = []
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "tests/**" = [
     "ANN",  # annotations
     "N802", # Function name should be lowercase

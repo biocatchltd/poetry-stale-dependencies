@@ -7,9 +7,10 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from poetry_stale_dependencies.inspections import PackageInspectSpecs
-from poetry_stale_dependencies.lock_spec import PackageSpec
+from poetry_stale_dependencies.lock_spec import LegacyPackageSource, PackageSpec
 
-def parse_timedelta(v: Any)->timedelta:
+
+def parse_timedelta(v: Any) -> timedelta:
     if not isinstance(v, str):
         raise ValueError("Timedelta must be a string (examples: 1d, 2w, 3mo, 4y)")
     if v.endswith("d"):
@@ -21,6 +22,7 @@ def parse_timedelta(v: Any)->timedelta:
     if v.endswith("y"):
         return timedelta(days=int(v[:-1]) * 365)
     raise ValueError("Timedelta must end with one of d, w, mo, y")
+
 
 @dataclass
 class PackageConfig:
@@ -40,10 +42,12 @@ class PackageConfig:
             ignore_versions=raw.get("ignore_versions", []),
             time_to_stale=time_to_stale,
         )
-    
+
     Default: ClassVar[PackageConfig]
 
-PackageConfig.Default = PackageConfig(False, [], None)
+
+PackageConfig.Default = PackageConfig(ignore=False, ignore_versions=[], time_to_stale=None)
+
 
 @dataclass
 class Config:
@@ -64,10 +68,10 @@ class Config:
             packages=packages,
             time_to_stale=parse_timedelta(raw.get("time_to_stale", "2w")),
         )
-    
+
     def lockfile_path(self) -> Path:
         return Path(self.lockfile)
-    
+
     def inspect_specs(self, package: str, specs: Sequence[PackageSpec]) -> Iterator[PackageInspectSpecs]:
         package_config = self.packages.get(package) or PackageConfig.Default
         if package_config.ignore:
@@ -77,10 +81,9 @@ class Config:
             specs = [spec for spec in specs if spec.version not in package_config.ignore_versions]
         if not specs:
             return
-        by_source = {}
+        by_source: dict[LegacyPackageSource | None, list[str]] = {}
         for spec in specs:
             by_source.setdefault(spec.source, []).append(spec.version)
         time_to_stale = package_config.time_to_stale or self.time_to_stale
         for source, versions in by_source.items():
             yield PackageInspectSpecs(package, source, time_to_stale, versions)
-    

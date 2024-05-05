@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 
-def render_timedelta(td: timedelta)->str:
+def render_timedelta(td: timedelta) -> str:
     if td.days >= 365:
         if td.days % 365 >= 30:
             return f"{td.days // 365}y {td.days % 365 // 30}mo"

@@ -1,16 +1,20 @@
 from pathlib import Path
+from typing import ClassVar
+
 import tomli
-from cleo.commands.command import Command
 from cleo.application import Application as CleoApplication
+from cleo.commands.command import Command
+from cleo.io.inputs.argument import Argument
+from cleo.io.outputs.output import Verbosity
+from httpx import Client
 from poetry.console.application import Application as PoetryApplication
 from poetry.plugins import ApplicationPlugin
 from poetry.poetry import Poetry
+
 from poetry_stale_dependencies.config import Config
 from poetry_stale_dependencies.inspections import PackageInspectSpecs
 from poetry_stale_dependencies.lock_spec import LockSpec
-from httpx import Client
-from cleo.io.outputs.output import Verbosity
-from cleo.io.inputs.argument import Argument
+
 
 class ShowStaleCommand(Command):
     """
@@ -19,25 +23,27 @@ class ShowStaleCommand(Command):
         {project_path? : Path to the pyproject.toml file}
     """
 
-    arguments = [
-        Argument("project_path", required=False, description="Path to the pyproject.toml file", default="pyproject.toml")
+    arguments: ClassVar[list[Argument]] = [
+        Argument(
+            "project_path", required=False, description="Path to the pyproject.toml file", default="pyproject.toml"
+        )
     ]
 
     name = "stale-dependencies show"
 
     def _get_config(self, application: CleoApplication, project_path: str) -> Config:
         try:
-            poetry: Poetry = application.poetry
+            poetry: Poetry = application.poetry  # type: ignore[attr-defined]
         except AttributeError:
-            with Path(project_path).open() as f:
+            with Path(project_path).open("rb") as f:
                 pyproject = tomli.load(f)
         else:
             pyproject = poetry.pyproject.data
-        
+
         raw = pyproject.get("tool", {}).get("stale-dependencies", {})
         return Config.from_raw(raw)
 
-    def handle(self):
+    def handle(self) -> int:
         project_path: str = self.argument("project_path")
         if not (application := self.application):
             raise Exception("Application not found")
@@ -59,13 +65,10 @@ class ShowStaleCommand(Command):
                 any_stale |= result
                 if not result:
                     self.line(f"{inspec_spec.package} is up to date", verbosity=Verbosity.VERBOSE)
-        if not any_stale:
-            self.line("No stale dependencies found", verbosity=Verbosity.NORMAL)
+        if any_stale:
+            return 1
+        self.line("No stale dependencies found", verbosity=Verbosity.NORMAL)
         return 0
-
-        
-        
-        
 
 
 class StaleDependenciesPlugin(ApplicationPlugin):
