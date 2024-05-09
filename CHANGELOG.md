@@ -1,4 +1,8 @@
 # poetry-stale-dependencies changelog
+## 0.1.2
+### Fixed
+* fixed inspection method name
+
 ## 0.1.1
 ### Fixed
 * fixed release workflow

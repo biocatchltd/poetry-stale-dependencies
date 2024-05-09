@@ -78,7 +78,7 @@ class ShowStaleCommand(Command):
         lock = Lock()
         with Client() as client:
             with ThreadPoolExecutor(n_workers) as pool:
-                inspect_results = pool.map(lambda spec: spec.inspect(client, self, lock), inspec_specs)
+                inspect_results = pool.map(lambda spec: spec.inspect_is_stale(client, self, lock), inspec_specs)
 
             for result in inspect_results:
                 any_stale |= result
