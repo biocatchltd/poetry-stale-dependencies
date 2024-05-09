@@ -1,10 +1,13 @@
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Lock
 from typing import ClassVar
 
 import tomli
 from cleo.application import Application as CleoApplication
 from cleo.commands.command import Command
 from cleo.io.inputs.argument import Argument
+from cleo.io.inputs.option import Option
 from cleo.io.outputs.output import Verbosity
 from httpx import Client
 from poetry.console.application import Application as PoetryApplication
@@ -29,6 +32,10 @@ class ShowStaleCommand(Command):
         )
     ]
 
+    options: ClassVar[list[Option]] = [
+        Option("multi_threading_workers", "w", flag=False, requires_value=False, default=None),
+    ]
+
     name = "stale-dependencies show"
 
     def _get_config(self, application: CleoApplication, project_path: str) -> Config:
@@ -45,6 +52,15 @@ class ShowStaleCommand(Command):
 
     def handle(self) -> int:
         project_path: str = self.argument("project_path")
+        raw_workers = self.option("multi_threading_workers")
+        n_workers: int | None
+        if raw_workers is not None:
+            n_workers = int(raw_workers)
+            if n_workers < 1:
+                n_workers = None
+        else:
+            n_workers = None
+
         if not (application := self.application):
             raise Exception("Application not found")
         config = self._get_config(application, project_path)
@@ -59,12 +75,13 @@ class ShowStaleCommand(Command):
         for package, specs in lock_spec.packages.items():
             inspec_specs.extend(config.inspect_specs(package, specs))
         any_stale = False
+        lock = Lock()
         with Client() as client:
-            for inspec_spec in inspec_specs:
-                result = inspec_spec.inspect(client, self)
+            with ThreadPoolExecutor(n_workers) as pool:
+                inspect_results = pool.map(lambda spec: spec.inspect(client, self, lock), inspec_specs)
+
+            for result in inspect_results:
                 any_stale |= result
-                if not result:
-                    self.line(f"{inspec_spec.package} is up to date", verbosity=Verbosity.VERBOSE)
         if any_stale:
             return 1
         self.line("No stale dependencies found", verbosity=Verbosity.NORMAL)

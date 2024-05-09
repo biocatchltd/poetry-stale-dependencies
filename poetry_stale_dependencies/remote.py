@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator, Sequence
+from collections.abc import Container, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from re import Pattern
@@ -36,7 +36,7 @@ class RemoteFileSpec:
     def from_raw(cls, raw: dict[str, Any]) -> RemoteFileSpec:
         raw_upload_time = raw["upload-time"]
         if version_info < (3, 11) and raw_upload_time.endswith("Z"):
-            # in older versions we need to manually fix a "Z" suffix
+            # in older python versions we need to manually fix a "Z" suffix
             raw_upload_time = raw_upload_time[:-1] + "+00:00"
         return cls(
             yanked=raw.get("yanked", False),
@@ -51,10 +51,18 @@ class RemoteSpecs:
         self.by_version = {release.version: release for release in releases}
 
     @classmethod
-    def from_simple(cls, source: LegacyPackageSource, raw: dict[str, Any], com: Command) -> RemoteSpecs:
+    def from_simple(
+        cls,
+        package_name: str,
+        source: LegacyPackageSource,
+        raw: dict[str, Any],
+        com: Command,
+        ignore_version: Container[str],
+        ignore_prerelease: bool,
+    ) -> RemoteSpecs:
         grouped_releases: dict[str, list[RemoteFileSpec]] = {}
         raw_files = raw.get("files", ())
-        versions = raw.get("versions", ())
+        versions: Sequence[str] = raw.get("versions", ())
         version_extractor = VersionExtractor(versions)
         for file in raw_files:
             filename = file.get("filename")
@@ -65,13 +73,40 @@ class RemoteSpecs:
                 com.line_error(f"Could not extract version from filename: {filename}", verbosity=Verbosity.VERBOSE)
                 continue
             grouped_releases.setdefault(version, []).append(RemoteFileSpec.from_raw(file))
-        releases = [
-            RemoteReleaseSpec(version, files) for version in versions if (files := grouped_releases.get(version))
-        ]
+        releases = []
+        for version in versions:
+            files = grouped_releases.get(version)
+            if not files:
+                com.line(
+                    f"{package_name} [{source.reference}]: Ignoring remote version {version} because it has no files",
+                    verbosity=Verbosity.VERY_VERBOSE,
+                )
+                continue
+            if ignore_prerelease and is_prerelease(version):
+                com.line(
+                    f"{package_name} [{source.reference}]: Ignoring remote version {version} because it is a prerelease",
+                    verbosity=Verbosity.VERY_VERBOSE,
+                )
+                continue
+            if version in ignore_version:
+                com.line(
+                    f"{package_name} [{source.reference}]: Ignoring remote version {version} because it is set to ignore in config",
+                    verbosity=Verbosity.VERY_VERBOSE,
+                )
+                continue
+
+            releases.append(RemoteReleaseSpec(version, files))
         return cls(source, releases)
 
     def applicable_releases(self) -> Iterator[RemoteReleaseSpec]:
         return (release for release in reversed(self.releases) if any(not file.yanked for file in release.files))
+
+
+prerelease_pattern = re.compile(r".*(rc|a|b|dev)\d*$")
+
+
+def is_prerelease(version: str) -> bool:
+    return bool(prerelease_pattern.fullmatch(version))
 
 
 class VersionExtractor:
@@ -128,4 +163,6 @@ def pull_remote_specs(session: Client, specs: PackageInspectSpecs, com: Command)
         raise ValueError(
             f"Failed to fetch remote specs for {specs.package} ({source.reference}): {response.status_code}"
         )
-    return RemoteSpecs.from_simple(source, response.json(), com)
+    return RemoteSpecs.from_simple(
+        specs.package, source, response.json(), com, specs.ignore_versions, specs.ignore_prereleases
+    )

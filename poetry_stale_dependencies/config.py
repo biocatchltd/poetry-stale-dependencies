@@ -26,9 +26,10 @@ def parse_timedelta(v: Any) -> timedelta:
 
 @dataclass
 class PackageConfig:
-    ignore: bool
-    ignore_versions: Sequence[str]
-    time_to_stale: timedelta | None
+    ignore: bool = False
+    ignore_versions: Sequence[str] = ()
+    time_to_stale: timedelta | None = None
+    include_remote_prepreleases: bool = False
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any]) -> PackageConfig:
@@ -41,12 +42,13 @@ class PackageConfig:
             ignore=raw.get("ignore", False),
             ignore_versions=raw.get("ignore_versions", []),
             time_to_stale=time_to_stale,
+            include_remote_prepreleases=raw.get("include_remote_prepreleases", False),
         )
 
     Default: ClassVar[PackageConfig]
 
 
-PackageConfig.Default = PackageConfig(ignore=False, ignore_versions=[], time_to_stale=None)
+PackageConfig.Default = PackageConfig()
 
 
 @dataclass
@@ -85,5 +87,13 @@ class Config:
         for spec in specs:
             by_source.setdefault(spec.source, []).append(spec.version)
         time_to_stale = package_config.time_to_stale or self.time_to_stale
+        ignore_versions = frozenset(package_config.ignore_versions)
         for source, versions in by_source.items():
-            yield PackageInspectSpecs(package, source, time_to_stale, versions)
+            yield PackageInspectSpecs(
+                package,
+                source,
+                time_to_stale,
+                versions,
+                ignore_versions,
+                not package_config.include_remote_prepreleases,
+            )

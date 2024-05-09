@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
-from warnings import warn
 
 from cleo.commands.command import Command
 from cleo.io.outputs.output import Verbosity
@@ -33,13 +32,13 @@ class LockSpec:
     def from_raw(cls, raw: dict[str, Any], com: Command) -> LockSpec:
         lock_version = raw.get("metadata", {}).get("lock-version", None)
         if lock_version is None:
-            warn("No lock version found, treating as v2")
+            com.line_error("No lock version found, treating as v2")
             return cls.from_raw_v2(raw, com)
 
         if isinstance(lock_version, str) and lock_version.startswith("2."):
             return cls.from_raw_v2(raw, com)
         else:
-            warn(f"Unsupported lock version: {lock_version!r}, treating as v2")
+            com.line_error(f"Unsupported lock version: {lock_version!r}, treating as v2")
             return cls.from_raw_v2(raw, com)
 
     @classmethod
