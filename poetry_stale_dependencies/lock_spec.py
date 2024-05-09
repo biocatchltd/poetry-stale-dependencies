@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, ClassVar
 
 from cleo.commands.command import Command
@@ -18,15 +20,62 @@ class LegacyPackageSource:
 LegacyPackageSource.Pypi = LegacyPackageSource("https://pypi.org/simple", "pypi")
 
 
+class UnkownMarker(Enum):
+    """
+    This will be used in case the dependency is optional but no marker is provided
+    """
+
+    unknown_marker = "unknown_marker"
+
+
+unknown_marker = UnkownMarker.unknown_marker
+
+
+@dataclass
+class PackageDependency:
+    version_req: str
+    marker: str | None | UnkownMarker
+
+    @classmethod
+    def from_raw(cls, raw: Any) -> PackageDependency | None:
+        if isinstance(raw, str):
+            return cls(raw, None)
+
+        version = raw.get("version")
+        if version is None:
+            return None
+        raw_marker = raw.get("markers")
+        is_optional = raw.get("optional", False)
+        if is_optional and raw_marker is None:
+            marker = unknown_marker
+        else:
+            marker = raw_marker
+
+        return cls(version, marker)
+
+
 @dataclass
 class PackageSpec:
     version: str
     source: LegacyPackageSource | None
+    dependencies: Mapping[str, PackageDependency]
 
 
 @dataclass
 class LockSpec:
     packages: dict[str, list[PackageSpec]] = field(default_factory=dict)
+
+    def get_packages(
+        self, packages_to_inspect: Sequence[str], com: Command
+    ) -> Iterator[tuple[str, Sequence[PackageSpec]]]:
+        if packages_to_inspect:
+            for package in packages_to_inspect:
+                if specs := self.packages.get(package):
+                    yield package, specs
+                else:
+                    com.line_error(f"Package {package!r} not found in lock file", verbosity=Verbosity.NORMAL)
+        else:
+            yield from self.packages.items()
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any], com: Command) -> LockSpec:
@@ -69,5 +118,16 @@ class LockSpec:
                     reference=raw_source.get("reference"),
                 )
 
-            packages.setdefault(name, []).append(PackageSpec(version, source))
+            dependencies = {}
+            if raw_dependencies := package.get("dependencies"):
+                for dep_name, dep_raw in raw_dependencies.items():
+                    if dep := PackageDependency.from_raw(dep_raw):
+                        dependencies[dep_name] = dep
+                    else:
+                        com.line_error(
+                            f"Invalid dependency {dep_name!r} for package {name}, ignoring",
+                            verbosity=Verbosity.NORMAL,
+                        )
+
+            packages.setdefault(name, []).append(PackageSpec(version, source, dependencies))
         return cls(packages)

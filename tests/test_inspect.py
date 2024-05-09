@@ -39,13 +39,15 @@ def test_inspect_stale(foo_package, client, source, ignore_post2):
         "foo",
         source=source,
         time_to_stale=timedelta(days=2),
+        time_to_ripe=timedelta(),
         versions=["1.0.0", "2.5.0"],
         ignore_versions=["1.1.1"],
-        ignore_prereleases=True,
+        ignore_prereleases=True
+
     )
     if ignore_post2:
         inspect_specs.ignore_versions.append("1.0.0post2")
-    assert inspect_specs.inspect_is_stale(client, MagicMock(), MagicMock()) is True
+    assert inspect_specs.inspect_is_stale(client, MagicMock(), MagicMock(), MagicMock(), MagicMock()) is True
 
 
 @mark.parametrize("ignore_post1", [True, False])
@@ -54,10 +56,11 @@ def test_inspect_not_stale(foo_package, client, source, ignore_post1):
         "foo",
         source=source,
         time_to_stale=timedelta(days=2),
+        time_to_ripe=timedelta(),
         versions=["1.0.0", "2.5.0"],
         ignore_versions=["1.1.1", "1.0.1", "1.0.0post2"],
         ignore_prereleases=True,
     )
     if ignore_post1:
         inspect_specs.ignore_versions.append("1.0.0post")
-    assert inspect_specs.inspect_is_stale(client, MagicMock(), MagicMock()) is False
+    assert inspect_specs.inspect_is_stale(client, MagicMock(), MagicMock(), MagicMock(), MagicMock()) is False

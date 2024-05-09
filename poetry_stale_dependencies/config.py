@@ -13,6 +13,8 @@ from poetry_stale_dependencies.lock_spec import LegacyPackageSource, PackageSpec
 def parse_timedelta(v: Any) -> timedelta:
     if not isinstance(v, str):
         raise ValueError("Timedelta must be a string (examples: 1d, 2w, 3mo, 4y)")
+    if v == "0":
+        return timedelta(0)
     if v.endswith("d"):
         return timedelta(days=int(v[:-1]))
     if v.endswith("w"):
@@ -29,7 +31,8 @@ class PackageConfig:
     ignore: bool = False
     ignore_versions: Sequence[str] = ()
     time_to_stale: timedelta | None = None
-    include_remote_prepreleases: bool = False
+    time_to_ripe: timedelta | None = None
+    include_prereleases: bool = False
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any]) -> PackageConfig:
@@ -38,11 +41,18 @@ class PackageConfig:
             time_to_stale = parse_timedelta(tts)
         else:
             time_to_stale = None
+
+        ttr = raw.get("time_to_ripe")
+        if ttr is not None:
+            time_to_ripe = parse_timedelta(ttr)
+        else:
+            time_to_ripe = None
         return cls(
             ignore=raw.get("ignore", False),
             ignore_versions=raw.get("ignore_versions", []),
             time_to_stale=time_to_stale,
-            include_remote_prepreleases=raw.get("include_remote_prepreleases", False),
+            time_to_ripe=time_to_ripe,
+            include_remote_prepreleases=raw.get("include_prereleases", False),
         )
 
     Default: ClassVar[PackageConfig]
@@ -57,6 +67,7 @@ class Config:
     sources: Sequence[str]
     packages: Mapping[str, PackageConfig]
     time_to_stale: timedelta
+    time_to_ripe: timedelta
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any]) -> Config:
@@ -69,6 +80,7 @@ class Config:
             sources=raw.get("sources", ("pypi",)),
             packages=packages,
             time_to_stale=parse_timedelta(raw.get("time_to_stale", "2w")),
+            time_to_ripe=parse_timedelta(raw.get("time_to_ripe", "3d")),
         )
 
     def lockfile_path(self) -> Path:
@@ -87,13 +99,15 @@ class Config:
         for spec in specs:
             by_source.setdefault(spec.source, []).append(spec.version)
         time_to_stale = package_config.time_to_stale or self.time_to_stale
+        time_to_ripe = package_config.time_to_ripe or self.time_to_ripe
         ignore_versions = frozenset(package_config.ignore_versions)
         for source, versions in by_source.items():
             yield PackageInspectSpecs(
                 package,
                 source,
                 time_to_stale,
+                time_to_ripe,
                 versions,
                 ignore_versions,
-                not package_config.include_remote_prepreleases,
+                not package_config.include_prereleases,
             )

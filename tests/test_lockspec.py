@@ -42,7 +42,7 @@ def test_parse_lock(lock_version):
     lock = LockSpec.from_raw(lock_content, MagicMock())
 
     assert lock.packages == {
-        "foo": [PackageSpec("1.0.0", None), PackageSpec("5.6.7", None)],
-        "baz": [PackageSpec("2.0.0", LegacyPackageSource("https://pypi2.org/simple", "pypi2"))],
-        "booz": [PackageSpec("2.1.0", None)],
+        "foo": [PackageSpec("1.0.0", None, {}), PackageSpec("5.6.7", None, {})],
+        "baz": [PackageSpec("2.0.0", LegacyPackageSource("https://pypi2.org/simple", "pypi2"), {})],
+        "booz": [PackageSpec("2.1.0", None, {})],
     }
