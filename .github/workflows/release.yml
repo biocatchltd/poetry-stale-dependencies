@@ -42,6 +42,11 @@ jobs:
         echo git "$GIT_VER"
         [[ "$TOML_VER" == "$GIT_VER" ]]
         echo "__version__ = \"$GIT_VER\"" > poetry_stale_dependencies/_version.py
+
+    - name: build
+      run: |
+        poetry build
+        
     - name: Mint token
       id: mint
       uses: tschm/token-mint-action@v1.0.3
