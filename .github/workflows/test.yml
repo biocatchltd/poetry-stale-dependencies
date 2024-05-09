@@ -1,4 +1,4 @@
-name: Test YellowBox
+name: Test
 
 on:
   push:
