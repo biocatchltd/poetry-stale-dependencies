@@ -5,7 +5,7 @@ on:
   pull_request:
     types: [opened, reopened, edited, synchronize]
     branches:
-      - master
+      - main
 
 jobs:
   label-vlock-prs:
