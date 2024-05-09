@@ -6,6 +6,10 @@ on:
 
 jobs:
   publish:
+    permissions:
+      # This permission is required for trusted publishing.
+      id-token: write
+      contents: write
 
     runs-on: ubuntu-latest
 

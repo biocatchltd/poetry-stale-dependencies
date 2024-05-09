@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "poetry-stale-dependencies"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Biocatch LTD <you@example.com>"]
 
