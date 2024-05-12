@@ -11,12 +11,12 @@ from httpx import Client
 from poetry_stale_dependencies.lock_spec import LegacyPackageSource, LockSpec, PackageDependency, unknown_marker
 from poetry_stale_dependencies.project_spec import ProjectDependency, ProjectSpec
 from poetry_stale_dependencies.remote import pull_remote_specs
-from poetry_stale_dependencies.util import render_timedelta
+from poetry_stale_dependencies.util import PackageName, render_timedelta
 
 
 @dataclass
 class PackageInspectSpecs:
-    package: str
+    package: PackageName
     source: LegacyPackageSource | None
     time_to_stale: timedelta
     time_to_ripe: timedelta
@@ -108,8 +108,8 @@ class NonStalePackageInspectResults:
 
     def writelines(self, com: Command):
         com.line(
-            f"{self.package} [{self.source.reference}]: Package is up to date ({self.local_version.version})",
-            verbosity=Verbosity.VERBOSE,
+            f"<info>{self.package} [{self.source.reference}]</>: Package is up to date (<comment>{self.local_version.version}</>)",
+            verbosity=Verbosity.VERY_VERBOSE,
         )
         if self.latest_version.version == self.local_version.version:
             com.line(f"\t{self.local_version.version} is latest", verbosity=Verbosity.VERY_VERBOSE)
@@ -132,19 +132,20 @@ class StalePackageInspectResults:
     def writelines(self, com: Command):
         delta = self.latest_version.time - self.local_version.time
         com.line(
-            f"{self.package} [{self.source.reference}]: local version {self.local_version.version} is stale, latest is {self.latest_version.version} (delta: {render_timedelta(delta)})"
+            f"<info>{self.package} [{self.source.reference}]</>: local version <comment>{self.local_version.version}</> is stale, latest is <comment>{self.latest_version.version}</> (delta: <info>{render_timedelta(delta)}</>)"
         )
         com.line(
-            f"\t{self.local_version.version} was uploaded at {self.local_version.time.isoformat()}, {self.latest_version.version} was uploaded at {self.latest_version.time.isoformat()}",
+            f"\t<comment>{self.local_version.version}</> was uploaded at <comment>{self.local_version.time.isoformat()}</>, <comment>{self.latest_version.version}</> was uploaded at <comment>{self.latest_version.time.isoformat()}</>",
             verbosity=Verbosity.VERBOSE,
         )
         if self.oldest_non_stale is not None:
             com.line(
-                f"\toldest non-stale release is {self.oldest_non_stale.version} ({self.oldest_non_stale.time.isoformat()})",
+                f"\toldest non-stale release is <comment>{self.oldest_non_stale.version}</> (<comment>{self.oldest_non_stale.time.isoformat()}</>)",
                 verbosity=Verbosity.VERBOSE,
             )
         if self.dependencies:
-            com.line(f"\tused by {len(self.dependencies)}:", verbosity=Verbosity.VERBOSE)
+            use_plural = "usages" if len(self.dependencies) > 1 else "usage"
+            com.line(f"\tfound {len(self.dependencies)} {use_plural}:", verbosity=Verbosity.VERBOSE)
             for package_name, dep in self.dependencies:
                 if dep.marker is None:
                     marker_desc = ""
@@ -152,4 +153,7 @@ class StalePackageInspectResults:
                     marker_desc = " [unknown marker]"
                 else:
                     marker_desc = f" [{dep.marker}]"
-                com.line(f"\t\t{package_name}: {dep.version_req}{marker_desc}", verbosity=Verbosity.VERBOSE)
+                com.line(
+                    f"\t\t<info>{package_name}</>: {dep.version_req}<comment>{marker_desc}</>",
+                    verbosity=Verbosity.VERBOSE,
+                )

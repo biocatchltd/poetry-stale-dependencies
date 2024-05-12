@@ -14,9 +14,14 @@ from poetry_stale_dependencies.project_spec import ProjectDependency, ProjectSpe
 from tests.util import simple_v1_package, simple_v1_release
 
 
+@fixture(params=["foo", "foo-bar"])
+def package_name(request):
+    return request.param
+
+
 @fixture()
-def foo_package(client):
-    client.sources["https://pypi.org/simple"]["foo"] = simple_v1_package(
+def foo_package(client, package_name):
+    client.sources["https://pypi.org/simple"][package_name] = simple_v1_package(
         {
             "0.1.0": [
                 simple_v1_release("foo-0.1.0-py3-none-any.whl", "2020-01-01T00:00:00Z"),
@@ -38,15 +43,15 @@ def foo_package(client):
 
 
 @fixture()
-def project():
+def project(package_name):
     return ProjectSpec(
         dependencies_groups={
             "main": {
-                "foo": [ProjectDependency("yankee do", "is a teapot")],
+                package_name: [ProjectDependency("yankee do", "is a teapot")],
                 "bar": [ProjectDependency("something", "else")],
             },
             "dev": {
-                "foo": [ProjectDependency("yankee dev", "is a dev teapot")],
+                package_name: [ProjectDependency("yankee dev", "is a dev teapot")],
             },
             "docs": {"baz": [ProjectDependency("baz", "is a baz")]},
         }
@@ -55,9 +60,9 @@ def project():
 
 @mark.parametrize("ignore_post2", [True, False])
 @mark.parametrize("ignore_prereleases", [True, False])
-def test_inspect_stale(foo_package, client, source, ignore_post2, ignore_prereleases, project):
+def test_inspect_stale(foo_package, client, source, ignore_post2, ignore_prereleases, project, package_name):
     inspect_specs = PackageInspectSpecs(
-        "foo",
+        package_name,
         source=source,
         time_to_stale=timedelta(days=2),
         time_to_ripe=timedelta(),
@@ -69,7 +74,7 @@ def test_inspect_stale(foo_package, client, source, ignore_post2, ignore_prerele
         inspect_specs.ignore_versions.append("1.0.0post2")
     assert inspect_specs.inspect_is_stale(client, MagicMock(), project, MagicMock()) == [
         StalePackageInspectResults(
-            "foo",
+            package_name,
             LegacyPackageSource.Pypi,
             ResultsVersionSpec("1.0.0", date(2021, 1, 1)),
             ResultsVersionSpec("1.0.1", date(2022, 1, 1)),
@@ -83,9 +88,9 @@ def test_inspect_stale(foo_package, client, source, ignore_post2, ignore_prerele
 
 
 @mark.parametrize("ignore_post1", [True, False])
-def test_inspect_not_stale(foo_package, client, source, ignore_post1):
+def test_inspect_not_stale(foo_package, client, source, ignore_post1, package_name):
     inspect_specs = PackageInspectSpecs(
-        "foo",
+        package_name,
         source=source,
         time_to_stale=timedelta(days=2),
         time_to_ripe=timedelta(),
@@ -97,7 +102,7 @@ def test_inspect_not_stale(foo_package, client, source, ignore_post1):
         inspect_specs.ignore_versions.append("1.0.0post")
     assert inspect_specs.inspect_is_stale(client, MagicMock(), MagicMock(), MagicMock()) == [
         NonStalePackageInspectResults(
-            "foo",
+            package_name,
             LegacyPackageSource.Pypi,
             ResultsVersionSpec("1.0.0", date(2021, 1, 1)),
             ResultsVersionSpec("1.0.0", date(2021, 1, 1))

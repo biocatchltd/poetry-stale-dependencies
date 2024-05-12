@@ -1,4 +1,14 @@
+import re
 from datetime import timedelta
+from typing import NewType
+
+PackageName = NewType("PackageName", str)
+_package_repl_pattern = re.compile(r"[._-]+")
+
+
+def to_package_name(name: str) -> PackageName:
+    name = _package_repl_pattern.sub("-", name).lower()
+    return PackageName(name)
 
 
 def render_timedelta(td: timedelta) -> str:

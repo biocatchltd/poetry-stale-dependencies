@@ -8,6 +8,7 @@ from typing import Any, ClassVar
 
 from poetry_stale_dependencies.inspections import PackageInspectSpecs
 from poetry_stale_dependencies.lock_spec import LegacyPackageSource, PackageSpec
+from poetry_stale_dependencies.util import PackageName, to_package_name
 
 
 def parse_timedelta(v: Any) -> timedelta:
@@ -65,7 +66,7 @@ PackageConfig.Default = PackageConfig()
 class Config:
     lockfile: str
     sources: Sequence[str]
-    packages: Mapping[str, PackageConfig]
+    packages: Mapping[PackageName, PackageConfig]
     time_to_stale: timedelta
     time_to_ripe: timedelta
 
@@ -73,7 +74,7 @@ class Config:
     def from_raw(cls, raw: dict[str, Any]) -> Config:
         packages = {}
         for package, package_config in raw.get("packages", {}).items():
-            packages[package] = PackageConfig.from_raw(package_config)
+            packages[to_package_name(package)] = PackageConfig.from_raw(package_config)
 
         return cls(
             lockfile=raw.get("lockfile", "poetry.lock"),
@@ -86,7 +87,7 @@ class Config:
     def lockfile_path(self) -> Path:
         return Path(self.lockfile)
 
-    def inspect_specs(self, package: str, specs: Sequence[PackageSpec]) -> Iterator[PackageInspectSpecs]:
+    def inspect_specs(self, package: PackageName, specs: Sequence[PackageSpec]) -> Iterator[PackageInspectSpecs]:
         package_config = self.packages.get(package) or PackageConfig.Default
         if package_config.ignore:
             return None

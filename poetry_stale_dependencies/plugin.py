@@ -23,6 +23,7 @@ from poetry_stale_dependencies.inspections import (
 )
 from poetry_stale_dependencies.lock_spec import LockSpec
 from poetry_stale_dependencies.project_spec import ProjectSpec
+from poetry_stale_dependencies.util import to_package_name
 
 
 class ShowStaleCommand(Command):
@@ -76,7 +77,8 @@ class ShowStaleCommand(Command):
         return ret
 
     def handle(self) -> int:
-        packages_whitelist: list[str] = self.argument("packages")
+        raw_packages_whitelist: list[str] = self.argument("packages")
+        packages_whitelist = [to_package_name(package) for package in raw_packages_whitelist]
         project_path: str = self.option("project_path")
         raw_workers = self.option("multi_threading_workers")
         n_workers: int | None

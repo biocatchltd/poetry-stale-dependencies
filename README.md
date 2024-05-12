@@ -30,7 +30,8 @@ sources = [
     "pypi",
     "my_custom_source"  # note that currently only unauthenticated sources are supported
 ]
-time_to_stale = "1mo" # dependencies that default is 2 weeks
+time_to_stale = "1mo" # dependencies that have at lest this gap between their latest release and
+# the installed release will be marked as satle, default is 2 weeks
 time_to_ripe = "1d"  # releases that are less than 1 day old will not be considered, default is 3 days
 # we can also have per-package configurations
 [tool.stale-dependencies.packages]
