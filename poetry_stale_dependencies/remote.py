@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Container, Iterator, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from re import Pattern
 from sys import version_info
 from typing import TYPE_CHECKING, Any
@@ -13,6 +13,7 @@ from cleo.io.outputs.output import Verbosity
 from httpx import Client
 
 from poetry_stale_dependencies.lock_spec import LegacyPackageSource
+from poetry_stale_dependencies.util import render_timedelta
 
 if TYPE_CHECKING:
     from poetry_stale_dependencies.config import PackageInspectSpecs
@@ -98,8 +99,23 @@ class RemoteSpecs:
             releases.append(RemoteReleaseSpec(version, files))
         return cls(source, releases)
 
-    def applicable_releases(self) -> Iterator[RemoteReleaseSpec]:
-        return (release for release in reversed(self.releases) if any(not file.yanked for file in release.files))
+    def applicable_releases(self, package_name: str, ripe_time: date, com: Command) -> Iterator[RemoteReleaseSpec]:
+        for release in reversed(self.releases):
+            if all(file.yanked for file in release.files):
+                com.line(
+                    f"{package_name}[{self.source.reference}]: Ignoring release {release.version} because all files are yanked",
+                    verbosity=Verbosity.VERY_VERBOSE,
+                )
+                continue
+            release_time = release.upload_time().date()
+            if release_time > ripe_time:
+                age = date.today() - release_time
+                com.line(
+                    f"{package_name}[{self.source.reference}]: Ignoring release {release.version} because it was uploaded after ripe time (release age: {render_timedelta(age)})",
+                    verbosity=Verbosity.VERBOSE,
+                )
+                continue
+            yield release
 
 
 prerelease_pattern = re.compile(r".*(rc|a|b|dev)\d*$")

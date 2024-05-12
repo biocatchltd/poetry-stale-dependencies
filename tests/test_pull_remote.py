@@ -17,6 +17,7 @@ def test_pull_remote(client, source):
     client.sources["https://pypi.org/simple"]["foo"] = simple_v1_package(
         {
             "1.0.0": [
+                {},
                 simple_v1_release("foo-1.0.0-py3-none-any.whl", "2021-01-01T00:00:00Z"),
                 simple_v1_release("foo-1.0.0-py3-none-any.whl", "2021-05-01T00:00:00+00:00"),
                 simple_v1_release("foo-1.0.0-py3-none-any.whl", "2021-05-01T00:00:00+00:00", yanked=True),
@@ -36,14 +37,14 @@ def test_pull_remote(client, source):
         "foo",
         source=source,
         time_to_stale=timedelta(days=2),
+        time_to_ripe=timedelta(),
         versions=["1.0.0"],
         ignore_versions=["1.1.1"],
         ignore_prereleases=True,
     )
     remote = pull_remote_specs(client, specs, MagicMock())
-    releases = list(remote.applicable_releases())
+    releases = remote.releases
     assert releases == [
-        RemoteReleaseSpec("1.0.1", [RemoteFileSpec(False, datetime(2022, 1, 1, tzinfo=UTC))]),
         RemoteReleaseSpec(
             "1.0.0",
             [
@@ -52,7 +53,10 @@ def test_pull_remote(client, source):
                 RemoteFileSpec(True, datetime(2021, 5, 1, tzinfo=UTC)),
             ],
         ),
+        RemoteReleaseSpec("1.0.1", [RemoteFileSpec(False, datetime(2022, 1, 1, tzinfo=UTC))]),
+        RemoteReleaseSpec("4.0.0", [RemoteFileSpec(True, datetime(2050, 1, 1, tzinfo=UTC))]),
     ]
 
-    assert releases[0].upload_time() == datetime(2022, 1, 1, tzinfo=UTC)
-    assert releases[1].upload_time() == datetime(2021, 1, 1, tzinfo=UTC)
+    assert releases[0].upload_time() == datetime(2021, 1, 1, tzinfo=UTC)
+    assert releases[1].upload_time() == datetime(2022, 1, 1, tzinfo=UTC)
+    assert releases[2].upload_time() == datetime(2050, 1, 1, tzinfo=UTC)
