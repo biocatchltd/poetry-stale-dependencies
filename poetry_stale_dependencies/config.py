@@ -52,7 +52,7 @@ class PackageConfig:
             ignore_versions=raw.get("ignore_versions", []),
             time_to_stale=time_to_stale,
             time_to_ripe=time_to_ripe,
-            include_remote_prepreleases=raw.get("include_prereleases", False),
+            include_prereleases=raw.get("include_prereleases", False),
         )
 
     Default: ClassVar[PackageConfig]

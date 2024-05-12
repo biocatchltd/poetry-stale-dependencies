@@ -50,6 +50,7 @@ class ProjectSpec:
     def from_raw(cls, raw: dict[str, Any], com: Command) -> ProjectSpec:
         poetry = raw.get("tool", {}).get("poetry", {})
         if not poetry:  # poetry section is missing
+            com.line_error("No poetry section found in the project spec")
             return cls()
         name = poetry.get("name", "root")
         groups: dict[str, dict[str, list[ProjectDependency]]] = {}
@@ -69,7 +70,8 @@ class ProjectSpec:
                         dep_specs.append(dep)
                     else:
                         com.line_error(f"Invalid dependency specification: {raw_dep_spec!r}")
-                groups[name][package] = dep_specs
+                if dep_specs:
+                    groups[name][package] = dep_specs
 
         add_group("main", poetry.get("dependencies", {}))
         add_group("dev", poetry.get("dev-dependencies", {}))

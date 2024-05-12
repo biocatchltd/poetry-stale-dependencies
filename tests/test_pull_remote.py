@@ -17,6 +17,7 @@ def test_pull_remote(client, source):
     client.sources["https://pypi.org/simple"]["foo"] = simple_v1_package(
         {
             "1.0.0": [
+                {},
                 simple_v1_release("foo-1.0.0-py3-none-any.whl", "2021-01-01T00:00:00Z"),
                 simple_v1_release("foo-1.0.0-py3-none-any.whl", "2021-05-01T00:00:00+00:00"),
                 simple_v1_release("foo-1.0.0-py3-none-any.whl", "2021-05-01T00:00:00+00:00", yanked=True),

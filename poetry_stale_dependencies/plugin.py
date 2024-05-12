@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from itertools import chain
 from pathlib import Path
-from threading import Lock
 from typing import ClassVar
 
 import tomli
@@ -16,7 +16,11 @@ from poetry.plugins import ApplicationPlugin
 from poetry.poetry import Poetry
 
 from poetry_stale_dependencies.config import Config, parse_timedelta
-from poetry_stale_dependencies.inspections import PackageInspectSpecs
+from poetry_stale_dependencies.inspections import (
+    NonStalePackageInspectResults,
+    PackageInspectSpecs,
+    StalePackageInspectResults,
+)
 from poetry_stale_dependencies.lock_spec import LockSpec
 from poetry_stale_dependencies.project_spec import ProjectSpec
 
@@ -110,16 +114,16 @@ class ShowStaleCommand(Command):
             inspec_specs.extend(config.inspect_specs(package, specs))
         any_stale = False
 
-        def inspect(spec: PackageInspectSpecs) -> bool:
-            return spec.inspect_is_stale(client, lock_spec, project, self, lock)
+        def inspect(spec: PackageInspectSpecs) -> list[StalePackageInspectResults | NonStalePackageInspectResults]:
+            return spec.inspect_is_stale(client, lock_spec, project, self)
 
-        lock = Lock()
-        with Client() as client:
-            with ThreadPoolExecutor(n_workers) as pool:
-                inspect_results = pool.map(inspect, inspec_specs)
+        with Client() as client, ThreadPoolExecutor(n_workers) as pool:
+            inspect_results = pool.map(inspect, inspec_specs)
 
-            for result in inspect_results:
-                any_stale |= result
+            for result in chain.from_iterable(inspect_results):
+                if isinstance(result, StalePackageInspectResults):
+                    any_stale = True
+                result.writelines(self)
         if any_stale:
             return 1
         self.line("No stale dependencies found", verbosity=Verbosity.NORMAL)

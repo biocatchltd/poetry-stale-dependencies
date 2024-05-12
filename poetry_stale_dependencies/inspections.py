@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Container, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from threading import Lock
+from datetime import date, datetime, timedelta
 
 from cleo.commands.command import Command
 from cleo.io.outputs.output import Verbosity
@@ -26,10 +25,10 @@ class PackageInspectSpecs:
     ignore_prereleases: bool
 
     def inspect_is_stale(
-        self, session: Client, lock_spec: LockSpec, project_spec: ProjectSpec, com: Command, com_lock: Lock
-    ) -> bool:
+        self, session: Client, lock_spec: LockSpec, project_spec: ProjectSpec, com: Command
+    ) -> list[StalePackageInspectResults | NonStalePackageInspectResults]:
         remote = pull_remote_specs(session, self, com)
-        ret = False
+        ret: list[StalePackageInspectResults | NonStalePackageInspectResults] = []
         for local_version in self.versions:
             # we need to get the time of the current releases
             if (local_spec := remote.by_version.get(local_version)) is None:
@@ -44,76 +43,113 @@ class PackageInspectSpecs:
             applicable_releases = remote.applicable_releases(self.package, ripe_time, com)
             latest = next(applicable_releases)
             latest_time = latest.upload_time().date()
-            delta = latest_time - local_version_time
             if latest_time > stale_time:
-                with com_lock:
-                    ret = True
-                    com.line(
-                        f"{self.package} [{remote.source.reference}]: local version {local_version} is stale, latest is {latest.version} (delta: {render_timedelta(delta)})",
-                        verbosity=Verbosity.NORMAL,
-                    )
-                    com.line(
-                        f"\t{local_version} was uploaded at {local_version_time.isoformat()}, {latest.version} was uploaded at {latest_time.isoformat()}",
-                        verbosity=Verbosity.VERBOSE,
-                    )
-                    if com.io.is_verbose():
-                        oldest_non_stale = None
-                        # note that there will always be at least one more applicable release: the local version
-                        for release in applicable_releases:
-                            upload_time = release.upload_time().date()
-                            if upload_time > stale_time:
-                                oldest_non_stale = (release, upload_time)
-                            else:
-                                break
-                        if oldest_non_stale is not None:
-                            com.line(
-                                f"\toldest non-stale release is {oldest_non_stale[0].version} ({oldest_non_stale[1].isoformat()})",
-                                verbosity=Verbosity.VERBOSE,
-                            )
-
-                        dependencies: list[tuple[str, PackageDependency | ProjectDependency]] = [
-                            (package_name, package_dep)
-                            for package_name, package_specs in lock_spec.packages.items()
-                            for package_spec in package_specs
-                            if (package_dep := package_spec.dependencies.get(self.package)) is not None
-                        ]
-
-                        for group_name, group in project_spec.dependencies_groups.items():
-                            if (group_deps := group.get(self.package)) is not None:
-                                for project_dep in group_deps:
-                                    if group_name == "main":
-                                        group_desc = project_spec.name
-                                    else:
-                                        group_desc = f"{project_spec.name}[{group_name}]"
-                                    dependencies.append((group_desc, project_dep))
-
-                        if dependencies:
-                            com.line(
-                                f"\tused by {len(dependencies)}:",
-                                verbosity=Verbosity.VERBOSE,
-                            )
-                            for package_name, dep in dependencies:
-                                if dep.marker is None:
-                                    marker_desc = ""
-                                elif dep.marker is unknown_marker:
-                                    marker_desc = " [unknown marker]"
-                                else:
-                                    marker_desc = f" [{dep.marker}]"
-                                com.line(
-                                    f"\t\t{package_name}: {dep.version_req}{marker_desc}",
-                                    verbosity=Verbosity.VERBOSE,
-                                )
-            else:
-                with com_lock:
-                    com.line(
-                        f"{self.package} [{remote.source.reference}]: Package is up to date ({local_version})",
-                        verbosity=Verbosity.VERBOSE,
-                    )
-                    if latest.version == local_version:
-                        com.line(f"\t{local_version} is latest", verbosity=Verbosity.VERY_VERBOSE)
+                # any release used that is before this time will be considered stale
+                time_to_non_stale = latest_time - self.time_to_stale
+                oldest_non_stale = None
+                # note that there will always be at least one more applicable release: the local version
+                for release in applicable_releases:
+                    upload_time = release.upload_time().date()
+                    if upload_time > time_to_non_stale:
+                        oldest_non_stale = ResultsVersionSpec(release.version, upload_time)
                     else:
-                        com.line(
-                            f"\t{local_version} was uploaded at {local_version_time.isoformat()}, latest ({latest.version}) was uploaded at {latest_time.isoformat()} (delta: {render_timedelta(delta)})",
-                            verbosity=Verbosity.VERY_VERBOSE,
-                        )
+                        break
+
+                dependencies: list[tuple[str, PackageDependency | ProjectDependency]] = [
+                    (package_name, package_dep)
+                    for package_name, package_specs in lock_spec.packages.items()
+                    for package_spec in package_specs
+                    if (package_dep := package_spec.dependencies.get(self.package)) is not None
+                ]
+
+                for group_name, group in project_spec.dependencies_groups.items():
+                    if (group_deps := group.get(self.package)) is not None:
+                        for project_dep in group_deps:
+                            if group_name == "main":
+                                group_desc = project_spec.name
+                            else:
+                                group_desc = f"{project_spec.name}[{group_name}]"
+                            dependencies.append((group_desc, project_dep))
+
+                ret.append(
+                    StalePackageInspectResults(
+                        self.package,
+                        remote.source,
+                        ResultsVersionSpec(local_version, local_version_time),
+                        ResultsVersionSpec(latest.version, latest_time),
+                        oldest_non_stale,
+                        dependencies,
+                    )
+                )
+            else:
+                ret.append(
+                    NonStalePackageInspectResults(
+                        self.package,
+                        remote.source,
+                        ResultsVersionSpec(local_version, local_version_time),
+                        ResultsVersionSpec(latest.version, latest_time),
+                    )
+                )
         return ret
+
+
+@dataclass
+class ResultsVersionSpec:
+    version: str
+    time: date
+
+
+@dataclass
+class NonStalePackageInspectResults:
+    package: str
+    source: LegacyPackageSource
+    local_version: ResultsVersionSpec
+    latest_version: ResultsVersionSpec
+
+    def writelines(self, com: Command):
+        com.line(
+            f"{self.package} [{self.source.reference}]: Package is up to date ({self.local_version.version})",
+            verbosity=Verbosity.VERBOSE,
+        )
+        if self.latest_version.version == self.local_version.version:
+            com.line(f"\t{self.local_version.version} is latest", verbosity=Verbosity.VERY_VERBOSE)
+        else:
+            com.line(
+                f"\t{self.local_version.version} was uploaded at {self.local_version.time.isoformat()}, latest ({self.latest_version.version}) was uploaded at {self.latest_version.time.isoformat()}",
+                verbosity=Verbosity.VERY_VERBOSE,
+            )
+
+
+@dataclass
+class StalePackageInspectResults:
+    package: str
+    source: LegacyPackageSource
+    local_version: ResultsVersionSpec
+    latest_version: ResultsVersionSpec
+    oldest_non_stale: ResultsVersionSpec | None
+    dependencies: list[tuple[str, PackageDependency | ProjectDependency]]
+
+    def writelines(self, com: Command):
+        delta = self.latest_version.time - self.local_version.time
+        com.line(
+            f"{self.package} [{self.source.reference}]: local version {self.local_version.version} is stale, latest is {self.latest_version.version} (delta: {render_timedelta(delta)})"
+        )
+        com.line(
+            f"\t{self.local_version.version} was uploaded at {self.local_version.time.isoformat()}, {self.latest_version.version} was uploaded at {self.latest_version.time.isoformat()}",
+            verbosity=Verbosity.VERBOSE,
+        )
+        if self.oldest_non_stale is not None:
+            com.line(
+                f"\toldest non-stale release is {self.oldest_non_stale.version} ({self.oldest_non_stale.time.isoformat()})",
+                verbosity=Verbosity.VERBOSE,
+            )
+        if self.dependencies:
+            com.line(f"\tused by {len(self.dependencies)}:", verbosity=Verbosity.VERBOSE)
+            for package_name, dep in self.dependencies:
+                if dep.marker is None:
+                    marker_desc = ""
+                elif dep.marker is unknown_marker:
+                    marker_desc = " [unknown marker]"
+                else:
+                    marker_desc = f" [{dep.marker}]"
+                com.line(f"\t\t{package_name}: {dep.version_req}{marker_desc}", verbosity=Verbosity.VERBOSE)
