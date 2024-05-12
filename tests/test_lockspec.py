@@ -38,7 +38,7 @@ def test_parse_lock(lock_version):
                 "source": {"type": "legacy", "url": "https://pypi2.org/simple", "reference": "pypi2"},
             },
             {
-                "name": "booz",
+                "name": "Blue--booz",
                 "version": "2.1.0",
                 "source": {"type": "new", "url": "https://pypi2.org/simple", "reference": "pypi2"},
             },
@@ -67,7 +67,7 @@ def test_parse_lock(lock_version):
             PackageSpec("5.6.7", None, {}),
         ],
         "baz": [PackageSpec("2.0.0", LegacyPackageSource("https://pypi2.org/simple", "pypi2"), {})],
-        "booz": [PackageSpec("2.1.0", None, {})],
+        "blue-booz": [PackageSpec("2.1.0", None, {})],
     }
 
     assert list(lock.get_packages(["foo", "baz"], MagicMock())) == [
@@ -77,5 +77,5 @@ def test_parse_lock(lock_version):
     assert list(lock.get_packages(None, MagicMock())) == [
         ("foo", lock.packages["foo"]),
         ("baz", lock.packages["baz"]),
-        ("booz", lock.packages["booz"]),
+        ("blue-booz", lock.packages["blue-booz"]),
     ]

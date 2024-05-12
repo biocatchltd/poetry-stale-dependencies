@@ -19,7 +19,7 @@ def test_parse_projspec(name):
                     },
                 },
                 "dev-dependencies": {
-                    "baz": "^3.0",
+                    "blue_Baz": "^3.0",
                 },
                 "group": {
                     "doc": {
@@ -59,7 +59,7 @@ def test_parse_projspec(name):
             "bar": [ProjectDependency("^2.0", "sys_platform == 'win32'")],
         },
         "dev": {
-            "baz": [ProjectDependency("^3.0", None)],
+            "blue-baz": [ProjectDependency("^3.0", None)],
             "jim": [ProjectDependency("^7.0", None)],
         },
         "doc": {

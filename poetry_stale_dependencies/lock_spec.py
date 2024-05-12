@@ -8,6 +8,8 @@ from typing import Any, ClassVar
 from cleo.commands.command import Command
 from cleo.io.outputs.output import Verbosity
 
+from poetry_stale_dependencies.util import PackageName, to_package_name
+
 
 @dataclass
 class LegacyPackageSource:
@@ -58,16 +60,16 @@ class PackageDependency:
 class PackageSpec:
     version: str
     source: LegacyPackageSource | None
-    dependencies: Mapping[str, PackageDependency]
+    dependencies: Mapping[PackageName, PackageDependency]
 
 
 @dataclass
 class LockSpec:
-    packages: dict[str, list[PackageSpec]] = field(default_factory=dict)
+    packages: dict[PackageName, list[PackageSpec]] = field(default_factory=dict)
 
     def get_packages(
-        self, packages_to_inspect: Sequence[str], com: Command
-    ) -> Iterator[tuple[str, Sequence[PackageSpec]]]:
+        self, packages_to_inspect: Sequence[PackageName], com: Command
+    ) -> Iterator[tuple[PackageName, Sequence[PackageSpec]]]:
         if packages_to_inspect:
             for package in packages_to_inspect:
                 if specs := self.packages.get(package):
@@ -92,17 +94,18 @@ class LockSpec:
 
     @classmethod
     def from_raw_v2(cls, raw: dict[str, Any], com: Command) -> LockSpec:
-        packages: dict[str, list[PackageSpec]] = {}
+        packages: dict[PackageName, list[PackageSpec]] = {}
         for package in raw.get("package", ()):
-            name = package.get("name")
+            raw_name = package.get("name")
             version = package.get("version")
-            raw_source = package.get("source")
-            if name is None or version is None:
+            if raw_name is None or version is None:
                 com.line_error(
-                    f"Package missing name or version, package ({name=}, {version=}) will be ignored",
+                    f"Package missing name or version, package ({raw_name=}, {version=}) will be ignored",
                     verbosity=Verbosity.NORMAL,
                 )
                 continue
+            raw_source = package.get("source")
+            name = to_package_name(raw_name)
             if raw_source is None:
                 source = None
             elif raw_source.get("type") != "legacy":
@@ -129,5 +132,5 @@ class LockSpec:
                             verbosity=Verbosity.NORMAL,
                         )
 
-            packages.setdefault(name, []).append(PackageSpec(version, source, dependencies))
+            packages.setdefault(to_package_name(name), []).append(PackageSpec(version, source, dependencies))
         return cls(packages)

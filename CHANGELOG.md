@@ -1,4 +1,13 @@
 # poetry-stale-dependencies changelog
+## 0.2.1
+### Added
+* console messages are now colored
+### Changed
+* non-stale dependencies are now only shown in very-verbose mode
+### Fixed
+* package names are now normalized in accordance with pypi standards
+* fixed some typos in the README
+
 ## 0.2.0
 ### Changed
 * the `include_remote_prereleases` was renamed to `include_prereleases`

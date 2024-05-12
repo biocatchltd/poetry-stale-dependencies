@@ -6,6 +6,7 @@ from typing import Any
 from cleo.commands.command import Command
 
 from poetry_stale_dependencies.lock_spec import UnkownMarker, unknown_marker
+from poetry_stale_dependencies.util import PackageName, to_package_name
 
 
 @dataclass
@@ -44,7 +45,7 @@ class ProjectDependency:
 @dataclass
 class ProjectSpec:
     name: str = "root"
-    dependencies_groups: dict[str, dict[str, list[ProjectDependency]]] = field(default_factory=dict)
+    dependencies_groups: dict[str, dict[PackageName, list[ProjectDependency]]] = field(default_factory=dict)
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any], com: Command) -> ProjectSpec:
@@ -53,7 +54,7 @@ class ProjectSpec:
             com.line_error("No poetry section found in the project spec")
             return cls()
         name = poetry.get("name", "root")
-        groups: dict[str, dict[str, list[ProjectDependency]]] = {}
+        groups: dict[str, dict[PackageName, list[ProjectDependency]]] = {}
 
         def add_group(name: str, root: dict[str, Any]):
             if name not in groups:
@@ -71,7 +72,7 @@ class ProjectSpec:
                     else:
                         com.line_error(f"Invalid dependency specification: {raw_dep_spec!r}")
                 if dep_specs:
-                    groups[name][package] = dep_specs
+                    groups[name][to_package_name(package)] = dep_specs
 
         add_group("main", poetry.get("dependencies", {}))
         add_group("dev", poetry.get("dev-dependencies", {}))
