@@ -59,7 +59,8 @@ class PackageInspectSpecs:
                     (package_name, package_dep)
                     for package_name, package_specs in lock_spec.packages.items()
                     for package_spec in package_specs
-                    if (package_dep := package_spec.dependencies.get(self.package)) is not None
+                    if (package_deps := package_spec.dependencies.get(self.package)) is not None
+                    for package_dep in package_deps
                 ]
 
                 for group_name, group in project_spec.dependencies_groups.items():

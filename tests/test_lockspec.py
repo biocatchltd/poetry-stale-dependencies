@@ -24,6 +24,10 @@ def test_parse_lock(lock_version):
                     "baz": {"version": "2.0.0", "markers": "os_name == 'nt'"},
                     "booz": {"version": "2.1.0", "optional": True},
                     "zim": {"im": "invalid"},
+                    "sham": [
+                        "1.0.0",
+                        {"version": "2.0.0", "markers": "os_name == 'nt'"},
+                    ],
                 },
             },
             {
@@ -59,9 +63,10 @@ def test_parse_lock(lock_version):
                 "1.0.0",
                 None,
                 {
-                    "bar": PackageDependency("1.0.0", None),
-                    "baz": PackageDependency("2.0.0", "os_name == 'nt'"),
-                    "booz": PackageDependency("2.1.0", unknown_marker),
+                    "bar": [PackageDependency("1.0.0", None)],
+                    "baz": [PackageDependency("2.0.0", "os_name == 'nt'")],
+                    "booz": [PackageDependency("2.1.0", unknown_marker)],
+                    "sham": [PackageDependency("1.0.0", None), PackageDependency("2.0.0", "os_name == 'nt'")],
                 },
             ),
             PackageSpec("5.6.7", None, {}),

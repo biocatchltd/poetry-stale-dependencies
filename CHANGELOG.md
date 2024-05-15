@@ -1,4 +1,8 @@
 # poetry-stale-dependencies changelog
+## 0.2.2
+### Fixed
+* can now parse lockfiles with list-dependencies
+
 ## 0.2.1
 ### Added
 * console messages are now colored

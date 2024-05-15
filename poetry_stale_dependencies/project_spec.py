@@ -15,31 +15,32 @@ class ProjectDependency:
     marker: str | None | UnkownMarker
 
     @classmethod
-    def from_raw(cls, raw: Any) -> ProjectDependency | None:
+    def from_raw(cls, raw: object) -> ProjectDependency | None:
         if isinstance(raw, str):
             return cls(raw, None)
+        if isinstance(raw, dict):
+            version = raw.get("version")
+            if version is None:
+                return None
+            marker_parts = []
+            raw_marker = raw.get("markers")
+            if raw_marker is not None:
+                marker_parts.append(raw_marker)
+            python = raw.get("python")
+            if python is not None:
+                marker_parts.append(f"python_version{python}")
 
-        version = raw.get("version")
-        if version is None:
-            return None
-        marker_parts = []
-        raw_marker = raw.get("markers")
-        if raw_marker is not None:
-            marker_parts.append(raw_marker)
-        python = raw.get("python")
-        if python is not None:
-            marker_parts.append(f"python_version{python}")
+            is_optional = raw.get("optional", False)
+            marker: str | None | UnkownMarker
+            if is_optional and not marker_parts:
+                marker = unknown_marker
+            elif not marker_parts:
+                marker = None
+            else:
+                marker = " and ".join(marker_parts)
 
-        is_optional = raw.get("optional", False)
-        marker: str | None | UnkownMarker
-        if is_optional and not marker_parts:
-            marker = unknown_marker
-        elif not marker_parts:
-            marker = None
-        else:
-            marker = " and ".join(marker_parts)
-
-        return cls(version, marker)
+            return cls(version, marker)
+        return None
 
 
 @dataclass
