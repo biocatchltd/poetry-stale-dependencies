@@ -39,28 +39,30 @@ class PackageDependency:
     marker: str | None | UnkownMarker
 
     @classmethod
-    def from_raw(cls, raw: Any) -> PackageDependency | None:
+    def from_raw(cls, raw: object) -> PackageDependency | None:
         if isinstance(raw, str):
             return cls(raw, None)
+        if isinstance(raw, dict):
+            version = raw.get("version")
+            if version is None:
+                return None
+            raw_marker = raw.get("markers")
+            is_optional = raw.get("optional", False)
+            marker: str | None | UnkownMarker
+            if is_optional and raw_marker is None:
+                marker = unknown_marker
+            else:
+                marker = raw_marker
 
-        version = raw.get("version")
-        if version is None:
-            return None
-        raw_marker = raw.get("markers")
-        is_optional = raw.get("optional", False)
-        if is_optional and raw_marker is None:
-            marker = unknown_marker
-        else:
-            marker = raw_marker
-
-        return cls(version, marker)
+            return cls(version, marker)
+        return None
 
 
 @dataclass
 class PackageSpec:
     version: str
     source: LegacyPackageSource | None
-    dependencies: Mapping[PackageName, PackageDependency]
+    dependencies: Mapping[PackageName, Sequence[PackageDependency]]
 
 
 @dataclass
@@ -124,13 +126,21 @@ class LockSpec:
             dependencies = {}
             if raw_dependencies := package.get("dependencies"):
                 for dep_name, dep_raw in raw_dependencies.items():
-                    if dep := PackageDependency.from_raw(dep_raw):
-                        dependencies[dep_name] = dep
+                    if isinstance(dep_raw, list):
+                        deps_raw = dep_raw
                     else:
-                        com.line_error(
-                            f"Invalid dependency {dep_name!r} for package {name}, ignoring",
-                            verbosity=Verbosity.NORMAL,
-                        )
+                        deps_raw = [dep_raw]
+                    deps = []
+                    for dep_raw_item in deps_raw:
+                        if dep := PackageDependency.from_raw(dep_raw_item):
+                            deps.append(dep)
+                        else:
+                            com.line_error(
+                                f"Invalid dependency {dep_name!r} for package {name}, ignoring",
+                                verbosity=Verbosity.NORMAL,
+                            )
+                    if deps:
+                        dependencies[dep_name] = deps
 
             packages.setdefault(to_package_name(name), []).append(PackageSpec(version, source, dependencies))
         return cls(packages)
